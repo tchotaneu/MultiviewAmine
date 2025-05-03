@@ -412,7 +412,7 @@ class Multiview:
         self.min_count =1
         self.seed = 42
         self.workers=4
-        self.mode = "union" # inter
+        self.modefusion = "union" # inter
         self.model1 = None
         self.model2 = None
         self.view1 = None
@@ -625,7 +625,7 @@ class Multiview:
         voisins1 = dict(self.get_most_similar_model(self.model1, elt, 50))
         voisins2 = dict(self.get_most_similar_model(self.model2, elt, 50))
 
-        if self.mode == "inter":
+        if self.modefusion == "inter":
             communs = set(voisins1.keys()) & set(voisins2.keys())
 
             fusionnes = [
@@ -639,7 +639,7 @@ class Multiview:
             # print("Résultat intersection triée par max :", len(fusionnes_trie))
             return resultat
 
-        elif self.mode == "union":
+        elif self.modefusion == "union":
             raise NotImplementedError("La fusion par union n'est pas encore codée ici.")
 
         else:
@@ -660,13 +660,13 @@ class Multiview:
                                                                               # 10 pour union 
         voisins2 = dict(self.get_most_similar_model(self.model2, elt, 7)) # 25 est bon pou inter 
 
-        if self.mode == "inter":
+        if self.modefusion == "inter":
             communs = set(voisins1.keys()) & set(voisins2.keys())
             fusionnes = [
                 (n, max(voisins1[n], voisins2[n])) for n in communs
             ]
 
-        elif self.mode == "union":
+        elif self.modefusion == "union":
             tous_les_noeuds = set(voisins1.keys()) | set(voisins2.keys())
             fusionnes = []
 

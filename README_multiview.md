@@ -1,24 +1,33 @@
 # Multiview with AMINE (Active Module Identification through Network Embedding)
 
-**Active Module Identification through Node Embedding (AMINE)**  
-A method for detecting relevant subnetworks from biological interaction networks.
+## About AMINE
 
-AMINE is a flexible and efficient method for detecting subnetworks (modules) that are relevant with respect to a given biological signal, e.g., p-values associated with gene expression data. 
+AMINE (Active Module Identification through Node Embedding) is a method designed to identify biologically relevant subnetworks in large interaction graphs. It combines network topology and biological signal (e.g., p-values) using node embeddings and a clustering strategy.
+
 ---
 
 ## Multiview Extension (Added in this Fork)
 
-This fork introduces a *multiview* extension to the original AMINE framework. It enables the integration of multiple complementary graph views to improve the detection of active modules in biological networks.
+### Why Multiview?
 
-###  Key Features:
+This fork introduces a *multiview* extension to the original AMINE framework.  
+Rather than embedding biological signals directly into the interaction network topology, this version treats them as an independent source of information, creating a separate graph view from the signal.
+
+
+
+
+### Key Concepts:
+
 - Support for **dual-view embeddings**, where:
-  - **View 1** = original PPI topology
-  - **View 2** = graph reconstructed from biological signals (e.g., gene expression p-values)
+  - **View 1** preserves the original protein-protein interaction (PPI) topology.
+  - **View 2** is constructed based solely on biological signals (e.g., p-values), where edges reflect functional similarity or biological coherence between nodes.
 - Ability to compare, combine, and cluster embeddings from both views
-- Flexible fusion strategies: `union`, `intersection`, or `average`
+- Flexible fusion strategies: `union`, `intersection`, or `ponderation`
 - Modular design for extending to more than two views
 
-This extension follows the principles of SIMBA but allows explicit graph-level construction for each view before combining them.
+This multiview modeling better captures the complexity of biological systems, where multiple, overlapping biological processes can coexist and interact.  
+By decoupling structure and signal, this approach enables more flexible, modular, and biologically meaningful detection of active modules.
+
 
 ---
 
@@ -100,7 +109,7 @@ Input format is described in the `data/` directory.
 To run AMINE with the multiview extension:
 
 ```bash
-python -m amine.process_artificial_network --multiview --views 2 --fusion union
+python -m amine.process_artificial_network --model multiview --views 2 --fusion union
 ```
 
 This executes module detection over two constructed graph views and fuses the neighborhood similarities using the specified strategy.

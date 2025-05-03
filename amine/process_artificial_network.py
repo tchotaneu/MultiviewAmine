@@ -157,6 +157,34 @@ def parse_arguments():
         default=1,
         help="mean of the foreground used by Batra method (default=1)",
     )
+
+    parser.add_argument(
+        "--views",
+        dest="number_views",
+        type=int,
+        required=False,
+        default=2,
+        help="number of views",
+    )
+
+    parser.add_argument(
+        "--model",
+        dest="execute_mode",
+        required=False,
+        choices=["singleview", "multiview"],
+        default="Node2vec",
+        help="execution mode",
+    )
+    parser.add_argument(
+        "-f",
+        "--fusion",
+        dest="fusionviews",
+        required=False,
+        choices=["union", "intersection","ponderation"],
+        default="union",
+        help="fusion choice embbeding",
+    )
+   
     return parser.parse_args()
 
 
@@ -164,9 +192,12 @@ if __name__ == "__main__":
     # Entry point.
     arg = parse_arguments()
 
-    # Use Node2vec model
-    
-    model = models.Node2vec()
+    # choix de model selon 
+    if arg.execute_mode=="multiview":
+        model = models.Multiview()
+        model.modefusion=arg.fusionviews
+    else:
+        model = models.Node2vec()
      
     # Use aggregation zscore as fitness function.
     fitness_fun = lambda the_graph, clus: Scores.aggregation_from_pvalue(
