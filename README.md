@@ -1,4 +1,4 @@
-# AMINE (Active Module Identification through Network Embedding)
+# Multiview with AMINE (Active Module Identification through Network Embedding)
 
 Implementation of the active module identification method described in the manuscript:
 
@@ -8,8 +8,8 @@ Implementation of the active module identification method described in the manus
 
 Clone the repository and change to the project directory
 ```bash
-git clone https://github.com/claudepasquier/amine.git
-cd amine
+git clone https://github.com/tchotaneu/MultiviewAmine.git
+cd amineMultiview
 ```
 
 To set up the required dependencies for the project, you should create a virtual environment using your preferred package manager. For example, you can use mamba to create the environment including all the dependencies with the following commands:

@@ -411,7 +411,7 @@ class Multiview:
 
         self.min_count =1
         self.seed = 42
-        self.workers=2
+        self.workers=4
         self.mode = "union" # inter
         self.model1 = None
         self.model2 = None
@@ -553,17 +553,18 @@ class Multiview:
         G_vue2_ponderee : nx.Graph
             Graphe avec arêtes basées sur la similarité des p-values, poids = f_norm.
         """
+        #initialisation des vues
         G_vue1 = nx.Graph()
+        G_vue2_ponderee = nx.Graph()
+        G_vue2_uniforme = nx.Graph()
+        # vue 1 
         G_vue1.add_nodes_from(G.nodes(data=True))  # ajou
         G_vue1.add_edges_from(G.edges(data=True))  # ajoute les arêtes 
 
-       
+        # definition du seuil 
         t = 1 / (2 * seuil_pvalue)
         seuil_normalise = 1 - np.exp(-t)
-
-        G_vue2_ponderee = nx.Graph()
-        G_vue2_uniforme = nx.Graph()
-
+        
         G_vue2_ponderee.add_nodes_from(G.nodes(data=True))
         G_vue2_uniforme.add_nodes_from(G.nodes(data=True))
 
@@ -583,7 +584,7 @@ class Multiview:
                 G_vue2_ponderee.add_edge(u, v, weight=f_norm)
                 G_vue2_uniforme.add_edge(u, v)  # poids implicite = 1
 
-        return G_vue2_uniforme, G_vue2_ponderee
+        return G_vue1,G_vue2_uniforme, G_vue2_ponderee
 
 
 

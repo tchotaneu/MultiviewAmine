@@ -166,7 +166,7 @@ if __name__ == "__main__":
 
     # Use Node2vec model
     
-    model = models.Multiview()
+    model = models.Node2vec()
      
     # Use aggregation zscore as fitness function.
     fitness_fun = lambda the_graph, clus: Scores.aggregation_from_pvalue(
