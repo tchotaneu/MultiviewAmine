@@ -422,7 +422,7 @@ class Multiview:
         """
         Génère les deux vues à partir du graphe G et calcule leurs embeddings.
         """
-        self.view1, self.view2 = self.genererVue_Simba(G)
+        self.view1, self.view2= self.genererVue_Simba(G)
         print("la vue 1",self.view1)
         print("la vue 2",self.view2)
        
@@ -440,9 +440,9 @@ class Multiview:
         self.model2 = self.compute_embedding(self.view2,
                                             dimensions=64,
                                             walk_length=100,# 40 ou 50
-                                            num_walks=30, #20 ou 30
-                                            p=0.25,      #
-                                            q=2,         # encourage la coherence locale
+                                            num_walks=40, #20 ou 30
+                                            p=0.25,      #0.25
+                                            q=2,         # 2 encourage la coherence locale
                                             window=10,
                                             negative=5, 
                                             sg=1, 
@@ -533,60 +533,50 @@ class Multiview:
 
     #########################
 
-    def genererVue_Simba2(G: nx.Graph, seuil_pvalue=0.05):
+    def genererVue_Gaussian(self,G, epsilon=0.95):
         """
-        Génère deux versions de Vue 2 à partir du graphe G (avec p-values sur les nœuds) :
-        - une version pondérée par similarité des p-values (f_norm)
-        - une version uniforme avec les mêmes arêtes mais poids = 1
+        Construit un graphe basé sur la similarité des poids des nœuds.
 
-        Paramètres
-        ----------
-        G : nx.Graph
-            Graphe avec les nœuds possédant l'attribut 'weight' (p-value).
-        seuil_pvalue : float
-            Seuil biologique utilisé pour filtrer la similarité.
+        Paramètres:
+        G (nx.Graph): Graphe d'origine avec les poids des nœuds.
+        sigma (float): Paramètre de l'écart-type pour la fonction gaussienne.
+        epsilon (float): Seuil de similarité pour créer les arêtes.
 
-        Retour
-        ------
-        G_vue2_uniforme : nx.Graph
-            Graphe avec arêtes basées sur la similarité des p-values, poids = 1.
-        G_vue2_ponderee : nx.Graph
-            Graphe avec arêtes basées sur la similarité des p-values, poids = f_norm.
+        Retourne:
+        nx.Graph: Nouveau graphe construit à partir des similarités.
         """
-        #initialisation des vues
+        ### Construction de Vue 1 : PPI topologique pur
         G_vue1 = nx.Graph()
-        G_vue2_ponderee = nx.Graph()
-        G_vue2_uniforme = nx.Graph()
-        # vue 1 
         G_vue1.add_nodes_from(G.nodes(data=True))  # ajou
-        G_vue1.add_edges_from(G.edges(data=True))  # ajoute les arêtes 
+        G_vue1.add_edges_from(G.edges())
 
-        # definition du seuil 
-        t = 1 / (2 * seuil_pvalue)
-        seuil_normalise = 1 - np.exp(-t)
+        ### Construction de Vue 2 :similarité Gaussian
+
+        # Extraction des poids des nœuds
+        node_weights = {node: data['weight'] for node, data in G.nodes(data=True)}
+        nodes = list(G.nodes)
         
-        G_vue2_ponderee.add_nodes_from(G.nodes(data=True))
-        G_vue2_uniforme.add_nodes_from(G.nodes(data=True))
+        # Calcul de sigma 
+        sigma = np.std(list(node_weights.values()))
 
-        for u, v in itertools.combinations(G.nodes(), 2):
-            p_u = G.nodes[u].get("weight", None)
-            p_v = G.nodes[v].get("weight", None)
+        # Création du nouveau graphe
+        G_vue2 = nx.Graph()
 
-            if p_u is None or p_v is None:
-                continue
-            if p_u + p_v == 0:
-                continue
+        G_vue2.add_nodes_from(G.nodes(data=True))
 
-            f = 1 - abs(p_u - p_v) / (p_u + p_v)
-            f_norm = 1 - np.exp(-f)
+        # Calcul de la similarité et ajout des arêtes
+        for i in range(len(nodes)):
+            for j in range(i + 1, len(nodes)):
+                w_i = node_weights[nodes[i]]
+                w_j = node_weights[nodes[j]]
+                similarity = np.exp(-((w_i - w_j) ** 2) / (2 * sigma ** 2))
+                
+                if similarity >= epsilon:
+                    G_vue2.add_edge(nodes[i], nodes[j], weight=similarity)
 
-            if f_norm >= seuil_normalise:
-                G_vue2_ponderee.add_edge(u, v, weight=f_norm)
-                G_vue2_uniforme.add_edge(u, v)  # poids implicite = 1
+        return G_vue1,G_vue2
 
-        return G_vue1,G_vue2_uniforme, G_vue2_ponderee
-
-
+    
 
 #######################
     
@@ -613,38 +603,7 @@ class Multiview:
         except KeyError:
             print(f"Le nœud '{elt}' n'existe pas dans le modèle fourni.")
             return []
-    def get_most_similar1(self, elt: str, number: int) -> List[int]:
-        """
-        Récupère les voisins similaires dans les deux vues et les combine par intersection, 
-        en gardant la meilleure similarité (max) et trié par ordre décroissant.
-
-        Returns
-        -------
-        List[int] : Liste des nœuds similaires triés par score décroissant (intersection).
-        """
-        voisins1 = dict(self.get_most_similar_model(self.model1, elt, 50))
-        voisins2 = dict(self.get_most_similar_model(self.model2, elt, 50))
-
-        if self.modefusion == "inter":
-            communs = set(voisins1.keys()) & set(voisins2.keys())
-
-            fusionnes = [
-                (n, max(voisins1[n], voisins2[n])) for n in communs
-            ]
-
-            fusionnes_trie = sorted(fusionnes, key=lambda x: x[1], reverse=True)
-            resultat = [n for n, _ in fusionnes_trie[:50]]
-
-            # print("Résultat intersection triée par max :", len(fusionnes_trie))
-            # print("Résultat intersection triée par max :", len(fusionnes_trie))
-            return resultat
-
-        elif self.modefusion == "union":
-            raise NotImplementedError("La fusion par union n'est pas encore codée ici.")
-
-        else:
-            raise ValueError("mode doit être 'union' ou 'intersection'.")
-
+    
         
     def get_most_similar(self, elt: str, number: int) -> List[int]:
         """

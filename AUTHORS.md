@@ -6,6 +6,8 @@
 - Contributions:
   - Designed and implemented the multiview framework
   - Constructed independent biological signal views
+  - Method design  
+  - Algorithm design 
   - Developed view fusion strategies (union, intersection, early/late integration)
   - Integrated  clustering pipeline
   - Python implementation and integration with original AMINE pipeline

@@ -25,7 +25,7 @@ import time
 from random import Random
 
 import numpy as np
-
+from . import savefile
 from . import models
 from .datasets import Datasets
 from .module_detection import ModuleDetection
@@ -254,6 +254,7 @@ if __name__ == "__main__":
         results = module_detection.predict_modules(
             max_nb_modules=arg.nb_modules, cutoff=0.05
         )
+        
         end_time = time.perf_counter()
         pvalue = 0
         if results:
@@ -320,5 +321,8 @@ if __name__ == "__main__":
         print(
             f"{ctr + 1} len={nb_pred} true_hits={nb_th} found={nb_found} f1_score={f1_scores[-1]:.5f}, mean={statistics.mean(f1_scores):.5f}, variance={statistics.pstdev(f1_scores):.5f}, Q25={quartiles[0]:.5f}, Q50={quartiles[1]:.5f}, Q75={quartiles[2]:.5f}, low={low:.5f}, high={high:.5f}, out_low=[{','.join(out_low)}], out_high=[{','.join(out_high)}] pvalue={pvalue}"
         )
+        #savefile.saveCSV(ctr + 1, len({nb_pred}), true_hits={nb_th},found, 
+        #                 f1_score, mean={statistics.mean(f1_scores):.5f}, variance={statistics.pstdev(f1_scores):.5f}, Q25={quartiles[0]:.5f}, Q50={quartiles[1]:.5f}, Q75={quartiles[2]:.5f}, low={low:.5f}, high={high:.5f}, out_low=[{','.join(out_low)}], out_high=[{','.join(out_high)}] pvalue={pvalue}"
+        #))
     if arg.outfile:
         outfile.close()
