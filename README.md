@@ -154,4 +154,4 @@ MIT License.
 ## 7. Acknowledgments
 
 This project is a fork of [claudepasquier/amine](https://github.com/claudepasquier/amine),  
-with multiview support added by [your name or GitHub profile].
+with multiview support added by [Tchotaneu Ngatcha Giresse].
