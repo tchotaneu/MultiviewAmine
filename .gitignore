@@ -1,0 +1,59 @@
+# Fichiers et dossiers Python à ignorer
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# Environnements virtuels
+venv/
+env/
+ENV/
+.venv/
+.ENV/
+
+# Fichiers de logs
+*.log
+
+# Fichiers de configuration d'éditeurs
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project
+
+# Données temporaires
+*.tmp
+*.swp
+.DS_Store
+Thumbs.db
+
+# Sorties de notebooks Jupyter
+.ipynb_checkpoints
+*.nbconvert.ipynb
+
+# Fichiers de tests ou coverage
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+
+# Build
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Fichiers de sortie/données
+*.csv
+*.tsv
+*.out
+*.png
+*.pdf
+.ipynb
+# Dossiers personnalisés à ignorer (ajoute tes propres exclusions ici)
+docs/

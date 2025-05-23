@@ -30,6 +30,8 @@ from . import models
 from .datasets import Datasets
 from .module_detection import ModuleDetection
 from .scores import Scores
+import gc
+gc.collect()
 
 
 def parse_arguments():
@@ -180,7 +182,7 @@ def parse_arguments():
         "--fusion",
         dest="fusionviews",
         required=False,
-        choices=["union", "intersection","ponderation"],
+        choices=["union", "inter","ponderation"],
         default="union",
         help="fusion choice embbeding",
     )
@@ -214,6 +216,7 @@ if __name__ == "__main__":
         outfile = open(arg.outfile, "w")
         outfile.write("#graph,time(s),nb found,real size,true hits,pvalue\n")
     for ctr in range(arg.number_of_runs):
+       # ctr= #ligne a enleve 
         if arg.graph_generation == "guyondata":
             G = Datasets.get_guyon_graph(ctr + 1)
         elif arg.graph_generation == "gencat":
@@ -293,6 +296,8 @@ if __name__ == "__main__":
         nb_pred = len(pred)
         nb_th = len(th)
         nb_found = len(pred & th)
+        print("noeud predis",pred)
+        print("noeud commun",pred & th)
 
         if arg.outfile:
             perf = end_time - start_time

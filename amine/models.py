@@ -35,6 +35,8 @@ from gensim.models import FastText, Word2Vec
 from scipy.spatial import distance
 from .dimension_reduction import node2vec
 from .dimension_reduction.pecanpy import node2vec as n2v
+from .datasets import Datasets
+import matplotlib.pyplot as plt
 
 
 class Model(ABC):
@@ -422,16 +424,23 @@ class Multiview:
         """
         Génère les deux vues à partir du graphe G et calcule leurs embeddings.
         """
-        self.view1, self.view2= self.genererVue_Simba(G)
+        self.view1, self.view2= self.genererG(G)        #self.genererVue_Simba(G)
         print("la vue 1",self.view1)
         print("la vue 2",self.view2)
+        truehits = Datasets.get_groups(G)
+        noeuds=truehits[1]
+        poidTrueHit=self.extraire_poids_trueHIT(G,truehits)
+        stats=self.stats_poids_noeuds(G)
+        self.visualiser_sousgraphe_pvalue(G,noeuds)
+        print(poidTrueHit)
+        print(stats)
        
         self.model1 = self.compute_embedding(self.view1,
-                                            dimensions=64,
-                                            walk_length=100,
-                                            num_walks=30,
-                                            p=0.15, #0.25
-                                            q=2,
+                                            dimensions=64, #64
+                                            walk_length=75,
+                                            num_walks=40,
+                                            p=0.25, #0.25
+                                            q=2, #2 
                                             window=10,
                                             negative=5, 
                                             sg=1, 
@@ -439,7 +448,7 @@ class Multiview:
         
         self.model2 = self.compute_embedding(self.view2,
                                             dimensions=64,
-                                            walk_length=100,# 40 ou 50
+                                            walk_length=50,# 40 ou 50
                                             num_walks=40, #20 ou 30
                                             p=0.25,      #0.25
                                             q=2,         # 2 encourage la coherence locale
@@ -447,6 +456,65 @@ class Multiview:
                                             negative=5, 
                                             sg=1, 
                                             epochs=25)
+###############################
+    def visualiser_sousgraphe_pvalue(self,G, noeuds, fichier_png='sousgraphe_truehits.png'):
+        subG = G.subgraph(noeuds)
+        pos = nx.spring_layout(subG, seed=42)
+        labels = {n: f"{n}\n{G.nodes[n].get('weight', ''):.3f}" for n in subG.nodes}
+        pvalues = [G.nodes[n].get('weight', 0.0) for n in subG.nodes]
+        sizes = [300 + 1000*(0.05 - min(p, 0.05)) for p in pvalues]
+
+        # Correction : créer explicitement un Axes
+        fig, ax = plt.subplots(figsize=(10, 7))
+        nodes = nx.draw_networkx_nodes(
+            subG, pos, ax=ax,
+            node_color=pvalues, node_size=sizes, cmap=plt.cm.viridis_r
+        )
+        edges = nx.draw_networkx_edges(subG, pos, ax=ax, edge_color='gray')
+        nx.draw_networkx_labels(subG, pos, labels=labels, ax=ax, font_size=10)
+        ax.set_title("Sous-graphe des true hits (chaque nœud avec sa p-value)")
+        sm = plt.cm.ScalarMappable(cmap=plt.cm.viridis_r, norm=plt.Normalize(vmin=min(pvalues), vmax=max(pvalues)))
+        sm._A = []  # Nécessaire pour compatibilité matplotlib < 3.1
+        fig.colorbar(sm, ax=ax, label='p-value')
+        plt.tight_layout()
+        plt.savefig(fichier_png)
+        plt.close()
+        print(f"Le sous-graphe a été sauvegardé dans '{fichier_png}'.")
+
+
+
+####################################
+    def stats_poids_noeuds(self,G, noeuds=None):
+        """
+        Calcule les statistiques descriptives des poids (p-values) sur un ensemble de nœuds du graphe.
+        
+        Paramètres :
+        - G : nx.Graph, graphe avec attributs 'weight' sur les nœuds
+        - noeuds : liste ou ensemble d'ID de nœuds à analyser (ou None pour tous les nœuds)
+        
+        Retourne :
+        - Un dictionnaire avec moyenne, médiane, écart-type, min, max, et effectif
+        """
+        if noeuds is None:
+            poids = [data.get('weight') for _, data in G.nodes(data=True) if data.get('weight') is not None]
+        else:
+            poids = [G.nodes[n].get('weight') for n in noeuds if G.nodes[n].get('weight') is not None]
+        
+        if not poids:
+            return None  # Aucun poids trouvé
+        
+        stats = {
+            "effectif": len(poids),
+            "moyenne": np.mean(poids),
+            "mediane": np.median(poids),
+            "ecart_type": np.std(poids),
+            "min": np.min(poids),
+            "max": np.max(poids),
+            "proportion_<0.05": np.mean(np.array(poids) < 0.05)
+        }
+        return stats
+
+################################""
 
     def train_word2vec_from_walks(self, walks, dimensions, window, negative, sg, epochs):
         """
@@ -495,7 +563,7 @@ class Multiview:
 
         return model
 
-    def genererVue_Simba(self, G: nx.Graph, seuil_pvalue=0.8):
+    def genererVue_Simba(self, G: nx.Graph, seuil=0.8):
         """
         Génère Vue 1 (topologie PPI) et Vue 2 (graphe filtré par p-value, approche SIMBA).
 
@@ -507,7 +575,7 @@ class Multiview:
         G_vue1.add_edges_from(G.edges())
 
         ### Construction de Vue 2 : filtrage basé sur p-values
-        t = 1 / (2 * seuil_pvalue)
+        t = 1 / (2 * seuil)
         seuil_normalise = 1 - np.exp(-t)
 
         G_vue2 = nx.Graph()
@@ -529,18 +597,84 @@ class Multiview:
                 G_vue2.add_edge(u, v, weight=f_norm)
         
         return G_vue1, G_vue2
-    
+
+
+
+    def genererVue_Simba2( self,G: nx.Graph, seuil=0.8):
+        """
+        Connecte toutes les paires de nœuds (u, v) en fonction du seuil de similarité.
+        
+        Paramètres :
+        - G_vue2 : nx.Graph - Graphe filtré existant.
+        - G : nx.Graph - Graphe original avec les poids des nœuds.
+        - seuil : float - Seuil pour établir une nouvelle connexion.
+
+        Retourne :
+        - G_vue2 : nx.Graph - Graphe mis à jour avec les nouvelles connexions.
+        """
+         ### Construction de Vue 1 : PPI topologique pur
+        G_vue1 = nx.Graph()
+        G_vue2 = nx.Graph()
+        G_vue1.add_nodes_from(G.nodes(data=True))  # 
+        G_vue1.add_edges_from(G.edges())
+        # Calcul du seuil normalisé
+        t = 1 / (2 * seuil)
+        seuil_normalise = 1 - np.exp(-t)
+
+        # Parcours de toutes les paires de nœuds
+        nodes = list(G.nodes())
+        for i, u in enumerate(nodes):
+            for v in nodes[i + 1:]:
+                # Calcul de la similarité pour toutes les paires
+                p_u = G.nodes[u].get('weight', None)
+                p_v = G.nodes[v].get('weight', None)
+
+                if p_u is None or p_v is None:
+                    continue
+                if p_u + p_v == 0:
+                    continue
+
+                # Calcul de la similarité
+                f = 1 - abs(p_u - p_v) / (p_u + p_v)
+                f_norm = 1 - np.exp(-f)
+
+                # Si la similarité est suffisante, ajouter l'arête
+                if f_norm >= seuil_normalise:
+                    G_vue2.add_edge(u, v, weight=f_norm)
+
+        return G_vue1,G_vue2
+
 
     #########################
+    def extraire_poids_trueHIT(self,G, truehits):
+        """
+        Retourne un dictionnaire {noeud: poids} pour tous les nœuds présents dans le dictionnaire truehits,
+        où les poids sont extraits des attributs des nœuds du graphe G.
 
-    def genererVue_Gaussian(self,G, epsilon=0.95):
+        Paramètres :
+        - G : nx.Graph, graphe dont les nœuds portent un attribut 'weight'
+        - truehits : dict, {clé: ensemble_de_noeuds}
+
+        Retourne :
+        - dict {noeud: poids}
+        """
+        noeud_vers_poids = {}
+        for noeuds in truehits.values():
+            for n in noeuds:
+                poids = G.nodes[n].get('weight', None)
+                noeud_vers_poids[n] = poids
+        return noeud_vers_poids
+
+    #####################
+
+    def genererVue_Gaussian(self,G, seuil=0.9):
         """
         Construit un graphe basé sur la similarité des poids des nœuds.
 
         Paramètres:
         G (nx.Graph): Graphe d'origine avec les poids des nœuds.
         sigma (float): Paramètre de l'écart-type pour la fonction gaussienne.
-        epsilon (float): Seuil de similarité pour créer les arêtes.
+        seuil(float): Seuil de similarité pour créer les arêtes.
 
         Retourne:
         nx.Graph: Nouveau graphe construit à partir des similarités.
@@ -571,8 +705,37 @@ class Multiview:
                 w_j = node_weights[nodes[j]]
                 similarity = np.exp(-((w_i - w_j) ** 2) / (2 * sigma ** 2))
                 
-                if similarity >= epsilon:
+                if similarity >= seuil:
                     G_vue2.add_edge(nodes[i], nodes[j], weight=similarity)
+
+        return G_vue1,G_vue2
+   
+
+    def genererG( self,G: nx.Graph, p_value_seuil=0.05):
+        """
+        Ajoute à G_vue toutes les arêtes (u,v) existant dans G
+        pour lesquelles les deux nœuds ont une p-value < p_value_seuil.
+
+        - G_vue : nx.Graph, le graphe à mettre à jour
+        - G     : nx.Graph, le graphe d'origine avec attributs 'weight' (p-value)
+        - p_value_seuil : float, seuil pour la p-value (default 0.05)
+
+        Retourne :
+        - G_vue : nx.Graph, mis à jour
+        """
+        G_vue1 = nx.Graph()
+        G_vue1.add_nodes_from(G.nodes(data=True))  # ajou
+        G_vue1.add_edges_from(G.edges())
+        G_vue2=nx.Graph()
+        G_vue2.add_nodes_from(G.nodes(data=True))
+        for u, v in G.edges():
+            p_u = G.nodes[u].get('weight', None)
+            p_v = G.nodes[v].get('weight', None)
+
+            if (p_u is not None and p_v is not None 
+                    and p_u <= p_value_seuil and p_v <= p_value_seuil):
+                if not G_vue2.has_edge(u, v):
+                    G_vue2.add_edge(u, v, weight=1.0)  # Poids maximal, modifiable selon besoin
 
         return G_vue1,G_vue2
 
@@ -580,7 +743,7 @@ class Multiview:
 
 #######################
     
-    def get_most_similar_model(self, model, elt: str, number=20) -> List[int]:
+    def get_most_similar_model(self, model, elt: str, number=20) -> List[int]:   #get_most_similar_model
         """
         Récupère les 'number' nœuds les plus similaires à 'elt' dans un modèle Word2Vec donné.
 
@@ -604,51 +767,65 @@ class Multiview:
             print(f"Le nœud '{elt}' n'existe pas dans le modèle fourni.")
             return []
     
-        
-    def get_most_similar(self, elt: str, number: int) -> List[int]:
+
+    def get_most_similar(self, elt: str, number: int = 20) -> List[int]:
         """
-        Récupère les voisins similaires dans les deux vues.
-        Mode "inter" : intersection avec max des similarités.
-        Mode "union" : union avec max des similarités.
-        
+        Récupère les voisins similaires dans les deux vues ou dans une seule vue.
+
+        Parameters
+        ----------
+        elt : str
+            Le nœud pour lequel on recherche les voisins.
+        number : int, optional
+            Le nombre de voisins à récupérer par vue.
+        top_n : int, optional
+            Le nombre de voisins à retourner après fusion et tri.
+        view : str, optional
+            Spécifie la vue utilisée pour la similarité ('view1', 'view2', 'multi').
+
         Returns
         -------
         List[int] : Liste des nœuds similaires triés par similarité décroissante.
+
         """
-        voisins1 = dict(self.get_most_similar_model(self.model1, elt, 7)) # 25 est bon pour inter 
-                                                                              # 10 pour union 
-        voisins2 = dict(self.get_most_similar_model(self.model2, elt, 7)) # 25 est bon pou inter 
+    
+        view='multi' #  view =('view1', 'view2', 'multi')
+        voisins1 = dict(self.get_most_similar_model(self.model1, elt,7))
+        voisins2 = dict(self.get_most_similar_model(self.model2, elt,7))
 
-        if self.modefusion == "inter":
-            communs = set(voisins1.keys()) & set(voisins2.keys())
-            fusionnes = [
-                (n, max(voisins1[n], voisins2[n])) for n in communs
-            ]
+        if view == 'multi':
+            # Similarité uniquement basée sur la vue 1
+            fusionnes = list(voisins1.items())
 
-        elif self.modefusion == "union":
-            tous_les_noeuds = set(voisins1.keys()) | set(voisins2.keys())
-            fusionnes = []
+        elif view == 'view2':
+            # Similarité uniquement basée sur la vue 2
+            fusionnes = list(voisins2.items())
+            # print("liste fusionne type ",fusionnes)
 
-            for n in tous_les_noeuds:
-                score1 = voisins1.get(n, None)
-                score2 = voisins2.get(n, None)
+        elif view == 'multi':
+            if self.modefusion == "inter":
+                communs = set(voisins1.keys()) & set(voisins2.keys())
+                fusionnes = [(n, max(voisins1[n], voisins2[n])) for n in communs]
 
-                if score1 is not None and score2 is not None:
+            elif self.modefusion == "union":
+                tous_les_noeuds = set(voisins1.keys()) | set(voisins2.keys())
+                fusionnes = []
+
+                for n in tous_les_noeuds:
+                    score1 = voisins1.get(n, -float('inf'))
+                    score2 = voisins2.get(n, -float('inf'))
                     score = max(score1, score2)
-                elif score1 is not None:
-                    score = score1
-                else:
-                    score = score2
-
-                fusionnes.append((n, score))
-
+                    fusionnes.append((n, score))
+            else:
+                raise ValueError(f"Mode '{self.modefusion}' invalide. Choisir 'union' ou 'inter'.")
         else:
-            raise ValueError("mode doit être 'union' ou 'intersection'.")
+            raise ValueError(f"Vue '{view}' invalide. Choisir 'view1', 'view2' ou 'multi'.")
 
-        # Trier par score décroissant
+        # Tri par score décroissant
         fusionnes_trie = sorted(fusionnes, key=lambda x: x[1], reverse=True)
 
-        # Extraire les n premiers identifiants
-        resultat = [n for n, _ in fusionnes_trie[:20]]
+        # Extraction des `top_n` meilleurs voisins
+        resultat = [n for n, _ in fusionnes_trie[:number]]
 
         return resultat
+
